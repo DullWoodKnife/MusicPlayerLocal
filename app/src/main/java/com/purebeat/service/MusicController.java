@@ -231,6 +231,19 @@ public class MusicController {
             }
         }
 
+        // 同步通知 Service 更新内部播放列表状态，确保 Service 端 currentPlaylist
+        // 和 currentIndex 与客户端保持一致，避免 getCurrentSong() 返回 null
+        Intent intent = new Intent(context, MusicPlaybackService.class);
+        intent.setAction("com.purebeat.ACTION_SET_PLAYLIST");
+        intent.putExtra("start_index", startIndex);
+        // 将歌曲列表通过 Parcelable 传递
+        ArrayList<android.os.Parcelable> parcelableList = new ArrayList<>();
+        for (Song song : songs) {
+            parcelableList.add(song);
+        }
+        intent.putParcelableArrayListExtra("songs", parcelableList);
+        context.startService(intent);
+
         final List<Song> playlist = this.currentPlaylist;
         invokeCallback(new CallbackInvoker() {
             @Override

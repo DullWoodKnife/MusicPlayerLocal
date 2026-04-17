@@ -6,8 +6,10 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +23,7 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.purebeat.PureBeatApplication;
 import com.purebeat.R;
 import com.purebeat.database.AppDatabase;
@@ -38,21 +41,8 @@ public class SettingsFragment extends Fragment {
     private ExecutorService executor;
     private Handler mainHandler;
 
+    // 使用 null 安全初始化，延迟到 onViewCreated 时确认 Fragment 已 attached
     private ActivityResultLauncher<String> imagePickerLauncher;
-
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        imagePickerLauncher = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> {
-                if (uri != null) {
-                    saveBackgroundImage(uri);
-                }
-            }
-        );
-    }
 
     @Nullable
     @Override
@@ -73,6 +63,21 @@ public class SettingsFragment extends Fragment {
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
 
+        // ActivityResultLauncher 必须在 Fragment fully created 后注册，
+        // 否则 requireContext() / requireActivity() 抛出 IllegalStateException
+        if (imagePickerLauncher == null) {
+            imagePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                uri -> {
+                    // 此回调在 Fragment detached 时也可能被调用，
+                    // 必须做安全检查避免 NPE
+                    if (uri != null && isAdded() && getContext() != null) {
+                        saveBackgroundImage(uri);
+                    }
+                }
+            );
+        }
+
         tvScanMusic.setOnClickListener(v -> scanMusic());
         tvSelectBackground.setOnClickListener(v -> selectBackgroundImage());
         tvRemoveBackground.setOnClickListener(v -> removeBackgroundImage());
@@ -80,24 +85,40 @@ public class SettingsFragment extends Fragment {
     }
 
     private void scanMusic() {
+        if (!isAdded() || getContext() == null) return;
+
         Toast.makeText(getContext(), R.string.scanning, Toast.LENGTH_SHORT).show();
 
         executor.execute(() -> {
+            if (!isAdded() || getActivity() == null) return;
+
             PureBeatApplication app = (PureBeatApplication) requireActivity().getApplication();
             app.getMusicScanner().scanAllSongs();
 
-            mainHandler.post(() -> {
-                Toast.makeText(getContext(), R.string.scan_complete, Toast.LENGTH_SHORT).show();
-            });
+            if (isAdded() && getContext() != null) {
+                mainHandler.post(() -> {
+                    if (isAdded() && getContext() != null) {
+                        Toast.makeText(getContext(), R.string.scan_complete, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         });
     }
 
     private void selectBackgroundImage() {
+        // 确认 Fragment 处于有效状态后才启动图片选择器
+        if (!isAdded() || imagePickerLauncher == null) {
+            return;
+        }
         imagePickerLauncher.launch("image/*");
     }
 
     private void saveBackgroundImage(Uri uri) {
+        if (!isAdded() || getContext() == null) return;
+
         executor.execute(() -> {
+            if (!isAdded() || getContext() == null) return;
+
             try {
                 InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
                 if (inputStream == null) return;
@@ -127,21 +148,32 @@ public class SettingsFragment extends Fragment {
                 entity.setActive(true);
                 db.backgroundImageDao().insertBackground(entity);
 
-                mainHandler.post(() -> {
-                    Toast.makeText(getContext(), R.string.background_set, Toast.LENGTH_SHORT).show();
-                });
+                // 通知 MainActivity 刷新背景图
+                if (isAdded() && getContext() != null) {
+                    mainHandler.post(() -> {
+                        requireActivity().recreate();
+                    });
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
-                mainHandler.post(() -> {
-                    Toast.makeText(getContext(), R.string.error, Toast.LENGTH_SHORT).show();
-                });
+                if (isAdded() && getContext() != null) {
+                    mainHandler.post(() -> {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), R.string.error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
         });
     }
 
     private void removeBackgroundImage() {
+        if (!isAdded() || getContext() == null) return;
+
         executor.execute(() -> {
+            if (!isAdded() || getContext() == null) return;
+
             AppDatabase db = AppDatabase.getInstance(requireContext());
             BackgroundImageEntity bg = db.backgroundImageDao().getActiveBackground();
 
@@ -155,15 +187,23 @@ public class SettingsFragment extends Fragment {
                 // Remove from database
                 db.backgroundImageDao().deleteBackground(bg);
 
-                mainHandler.post(() -> {
-                    Toast.makeText(getContext(), R.string.background_removed, Toast.LENGTH_SHORT).show();
-                });
+                if (isAdded() && getContext() != null) {
+                    mainHandler.post(() -> {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), R.string.background_removed, Toast.LENGTH_SHORT).show();
+                            // 刷新 Activity 移除背景
+                            requireActivity().recreate();
+                        }
+                    });
+                }
             }
         });
     }
 
     private void showAboutDialog() {
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        if (!isAdded() || getContext() == null) return;
+
+        new MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.about)
             .setMessage("PureBeat v1.0.0\n\n一款简洁的本地音乐播放器\n支持多种音频格式\n无需登录，保护隐私")
             .setPositiveButton(R.string.ok, null)
@@ -173,6 +213,9 @@ public class SettingsFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        executor.shutdown();
+        if (executor != null) {
+            executor.shutdownNow();
+            executor = null;
+        }
     }
 }

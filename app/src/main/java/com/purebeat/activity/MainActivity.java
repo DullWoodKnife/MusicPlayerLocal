@@ -112,6 +112,9 @@ public class MainActivity extends AppCompatActivity implements MusicController.M
         PureBeatApplication app = (PureBeatApplication) getApplication();
         musicController = app.getMusicController();
         musicController.setCallback(this);
+        // 必须调用 connect() 才能建立与 MusicPlaybackService 的连接，
+        // 否则 mediaController 始终为 null，所有播放操作无效
+        musicController.connect();
 
         Intent intent = new Intent(this, MusicPlaybackService.class);
         startService(intent);

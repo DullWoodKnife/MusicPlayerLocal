@@ -12,6 +12,8 @@ import com.purebeat.model.Folder;
 import com.purebeat.model.Song;
 
 import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +25,32 @@ public class MusicScanner {
 
     public MusicScanner(ContentResolver contentResolver) {
         this.contentResolver = contentResolver;
+    }
+
+    /**
+     * 安全获取字符串，处理编码问题。
+     * MediaStore 返回的字符串可能使用不规范的编码，直接使用可能导致乱码。
+     * 此方法尝试使用 ISO-8859-1 读取，再用 UTF-8 重新编码。
+     */
+    private String getStringSafe(Cursor cursor, int columnIndex) {
+        if (columnIndex < 0 || cursor.isNull(columnIndex)) {
+            return "";
+        }
+        String raw = cursor.getString(columnIndex);
+        if (raw == null) {
+            return "";
+        }
+        // 如果字符串已经是有效的 UTF-8（不包含替换字符），直接返回
+        if (raw.contains("\uFFFD")) {
+            // 尝试用 ISO-8859-1 重新解释字节，再编码为 UTF-8
+            try {
+                byte[] bytes = raw.getBytes(StandardCharsets.ISO_8859_1);
+                return new String(bytes, StandardCharsets.UTF_8);
+            } catch (UnsupportedEncodingException e) {
+                return raw;
+            }
+        }
+        return raw;
     }
 
     public List<Song> scanAllSongs() {
@@ -73,14 +101,14 @@ public class MusicScanner {
 
             while (cursor.moveToNext()) {
                 long id = cursor.getLong(idColumn);
-                String title = cursor.getString(titleColumn);
-                String artist = cursor.getString(artistColumn);
-                String album = cursor.getString(albumColumn);
+                String title = getStringSafe(cursor, titleColumn);
+                String artist = getStringSafe(cursor, artistColumn);
+                String album = getStringSafe(cursor, albumColumn);
                 long duration = cursor.getLong(durationColumn);
                 long dateAdded = cursor.getLong(dateAddedColumn);
                 long size = cursor.getLong(sizeColumn);
-                String mimeType = cursor.getString(mimeTypeColumn);
-                String data = cursor.getString(dataColumn);
+                String mimeType = getStringSafe(cursor, mimeTypeColumn);
+                String data = getStringSafe(cursor, dataColumn);
 
                 if (TextUtils.isEmpty(title)) {
                     title = "Unknown";
@@ -215,14 +243,14 @@ public class MusicScanner {
 
             while (cursor.moveToNext()) {
                 long id = cursor.getLong(idColumn);
-                String title = cursor.getString(titleColumn);
-                String artist = cursor.getString(artistColumn);
-                String album = cursor.getString(albumColumn);
+                String title = getStringSafe(cursor, titleColumn);
+                String artist = getStringSafe(cursor, artistColumn);
+                String album = getStringSafe(cursor, albumColumn);
                 long duration = cursor.getLong(durationColumn);
                 long dateAdded = cursor.getLong(dateAddedColumn);
                 long size = cursor.getLong(sizeColumn);
-                String mimeType = cursor.getString(mimeTypeColumn);
-                String data = cursor.getString(dataColumn);
+                String mimeType = getStringSafe(cursor, mimeTypeColumn);
+                String data = getStringSafe(cursor, dataColumn);
 
                 if (TextUtils.isEmpty(title)) title = "Unknown";
                 if (TextUtils.isEmpty(artist)) artist = "Unknown Artist";

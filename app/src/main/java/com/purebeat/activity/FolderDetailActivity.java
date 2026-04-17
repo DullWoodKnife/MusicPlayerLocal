@@ -68,6 +68,8 @@ public class FolderDetailActivity extends AppCompatActivity implements SongAdapt
     private void initMusicController() {
         PureBeatApplication app = (PureBeatApplication) getApplication();
         musicController = app.getMusicController();
+        // 必须调用 connect() 以建立与 MusicPlaybackService 的连接
+        musicController.connect();
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
     }

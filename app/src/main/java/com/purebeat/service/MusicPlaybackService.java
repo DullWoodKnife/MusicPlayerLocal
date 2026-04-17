@@ -2,6 +2,8 @@ package com.purebeat.service;
 
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
@@ -84,6 +86,18 @@ public class MusicPlaybackService extends MediaSessionService {
     @Override
     public MediaSession onGetSession(MediaSession.ControllerInfo controllerInfo) {
         return mediaSession;
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && "com.purebeat.ACTION_SET_PLAYLIST".equals(intent.getAction())) {
+            ArrayList<Song> songs = intent.getParcelableArrayListExtra("songs");
+            int startIndex = intent.getIntExtra("start_index", 0);
+            if (songs != null && !songs.isEmpty()) {
+                setPlaylist(songs, startIndex);
+            }
+        }
+        return super.onStartCommand(intent, flags, startId);
     }
 
     @Override

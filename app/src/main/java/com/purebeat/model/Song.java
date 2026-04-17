@@ -1,8 +1,10 @@
 package com.purebeat.model;
 
 import android.net.Uri;
+import android.os.Parcel;
+import android.os.Parcelable;
 
-public class Song {
+public class Song implements Parcelable {
     private long id;
     private String title;
     private String artist;
@@ -34,6 +36,54 @@ public class Song {
         this.folderPath = folderPath;
         this.folderName = folderName;
     }
+
+    private Song(Parcel in) {
+        id = in.readLong();
+        title = in.readString();
+        artist = in.readString();
+        album = in.readString();
+        duration = in.readLong();
+        uri = in.readParcelable(Uri.class.getClassLoader());
+        albumArtUri = in.readParcelable(Uri.class.getClassLoader());
+        dateAdded = in.readLong();
+        size = in.readLong();
+        mimeType = in.readString();
+        folderPath = in.readString();
+        folderName = in.readString();
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeLong(id);
+        dest.writeString(title);
+        dest.writeString(artist);
+        dest.writeString(album);
+        dest.writeLong(duration);
+        dest.writeParcelable(uri, flags);
+        dest.writeParcelable(albumArtUri, flags);
+        dest.writeLong(dateAdded);
+        dest.writeLong(size);
+        dest.writeString(mimeType);
+        dest.writeString(folderPath);
+        dest.writeString(folderName);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    public static final Creator<Song> CREATOR = new Creator<Song>() {
+        @Override
+        public Song createFromParcel(Parcel in) {
+            return new Song(in);
+        }
+
+        @Override
+        public Song[] newArray(int size) {
+            return new Song[size];
+        }
+    };
 
     // Getters and Setters
     public long getId() { return id; }
