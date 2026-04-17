@@ -187,16 +187,10 @@ public class MusicScanner {
             return new ArrayList<>();
         }
 
-        List<Song> songs = new ArrayList<>();
-        StringBuilder selection = new StringBuilder();
-        selection.append(MediaStore.Audio.Media._ID).append(" IN (");
-        for (int i = 0; i < ids.size(); i++) {
-            selection.append(ids.get(i));
-            if (i < ids.size() - 1) {
-                selection.append(",");
-            }
-        }
-        selection.append(")");
+        // 用 IN 查询快速批量获取，Cursor 结果无序，
+        // 故先以 id 为 key 存入 HashMap，再按 ids 原始顺序构建返回列表，
+        // 确保歌曲顺序与用户操作（点击）顺序一致，避免播放错误歌曲导致崩溃。
+        Map<Long, Song> songMap = new HashMap<>();
 
         Uri collection;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -216,6 +210,16 @@ public class MusicScanner {
             MediaStore.Audio.Media.MIME_TYPE,
             MediaStore.Audio.Media.DATA
         };
+
+        StringBuilder selection = new StringBuilder();
+        selection.append(MediaStore.Audio.Media._ID).append(" IN (");
+        for (int i = 0; i < ids.size(); i++) {
+            selection.append(ids.get(i));
+            if (i < ids.size() - 1) {
+                selection.append(",");
+            }
+        }
+        selection.append(")");
 
         Cursor cursor = contentResolver.query(
             collection,
@@ -274,10 +278,19 @@ public class MusicScanner {
                     folderPath, folderName
                 );
 
-                songs.add(song);
+                songMap.put(id, song);
             }
 
             cursor.close();
+        }
+
+        // 按 ids 原始顺序构建返回列表
+        List<Song> songs = new ArrayList<>();
+        for (Long id : ids) {
+            Song song = songMap.get(id);
+            if (song != null) {
+                songs.add(song);
+            }
         }
 
         return songs;

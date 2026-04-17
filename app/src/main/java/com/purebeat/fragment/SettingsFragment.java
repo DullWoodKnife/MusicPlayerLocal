@@ -1,15 +1,8 @@
 package com.purebeat.fragment;
 
-import android.Manifest;
-import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
-import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,7 +13,6 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -35,14 +27,44 @@ import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * 设置页 Fragment。
+ *
+ * 背景图功能设计（解决 recreate() 导致的播放器状态丢失问题）：
+ * - 背景图路径持久化到 SharedPreferences（独立于 Activity 生命周期）
+ * - MainActivity 在 onCreate 时从 SharedPreferences 读取并加载背景图
+ * - SettingsFragment 通过 Fragment Result API 通知 MainActivity 刷新背景
+ * - ActivityResultLauncher 使用静态注册块（Fragment#registerForActivityResult），
+ *   避免在 Fragment attached 之前注册导致 IllegalStateException 崩溃
+ */
 public class SettingsFragment extends Fragment {
+
+    private static final String PREF_NAME = "purebeat_settings";
+    private static final String KEY_BG_IMAGE_PATH = "background_image_path";
+
+    // Fragment Result API，用于跨 Fragment 通知 MainActivity 刷新背景图
+    private static final String RESULT_KEY_BG_CHANGED = "bg_changed";
+    private static final String RESULT_KEY_BG_REMOVED = "bg_removed";
 
     private TextView tvScanMusic, tvSelectBackground, tvRemoveBackground, tvAbout;
     private ExecutorService executor;
-    private Handler mainHandler;
+    private SharedPreferences pref;
 
-    // 使用 null 安全初始化，延迟到 onViewCreated 时确认 Fragment 已 attached
-    private ActivityResultLauncher<String> imagePickerLauncher;
+    // 静态注册 ActivityResultLauncher（必须放在 Fragment 构造块或静态字段中，
+    // 在 onCreateView 之前注册；放在 onViewCreated 中注册可能因 Fragment 状态
+    // 不一致导致 IllegalStateException）
+    private final ActivityResultLauncher<String> imagePickerLauncher =
+        registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                // Fragment Result API：通知父 Activity（MainActivity）刷新背景
+                if (uri != null) {
+                    requireActivity().getSupportFragmentManager()
+                        .setFragmentResult(RESULT_KEY_BG_CHANGED, new Bundle());
+                    saveBackgroundImage(uri);
+                }
+            }
+        );
 
     @Nullable
     @Override
@@ -55,28 +77,13 @@ public class SettingsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        pref = requireContext().getSharedPreferences(PREF_NAME, android.content.Context.MODE_PRIVATE);
+        executor = Executors.newSingleThreadExecutor();
+
         tvScanMusic = view.findViewById(R.id.tv_scan_music);
         tvSelectBackground = view.findViewById(R.id.tv_select_background);
         tvRemoveBackground = view.findViewById(R.id.tv_remove_background);
         tvAbout = view.findViewById(R.id.tv_about);
-
-        executor = Executors.newSingleThreadExecutor();
-        mainHandler = new Handler(Looper.getMainLooper());
-
-        // ActivityResultLauncher 必须在 Fragment fully created 后注册，
-        // 否则 requireContext() / requireActivity() 抛出 IllegalStateException
-        if (imagePickerLauncher == null) {
-            imagePickerLauncher = registerForActivityResult(
-                new ActivityResultContracts.GetContent(),
-                uri -> {
-                    // 此回调在 Fragment detached 时也可能被调用，
-                    // 必须做安全检查避免 NPE
-                    if (uri != null && isAdded() && getContext() != null) {
-                        saveBackgroundImage(uri);
-                    }
-                }
-            );
-        }
 
         tvScanMusic.setOnClickListener(v -> scanMusic());
         tvSelectBackground.setOnClickListener(v -> selectBackgroundImage());
@@ -96,7 +103,7 @@ public class SettingsFragment extends Fragment {
             app.getMusicScanner().scanAllSongs();
 
             if (isAdded() && getContext() != null) {
-                mainHandler.post(() -> {
+                requireActivity().runOnUiThread(() -> {
                     if (isAdded() && getContext() != null) {
                         Toast.makeText(getContext(), R.string.scan_complete, Toast.LENGTH_SHORT).show();
                     }
@@ -106,10 +113,7 @@ public class SettingsFragment extends Fragment {
     }
 
     private void selectBackgroundImage() {
-        // 确认 Fragment 处于有效状态后才启动图片选择器
-        if (!isAdded() || imagePickerLauncher == null) {
-            return;
-        }
+        if (!isAdded()) return;
         imagePickerLauncher.launch("image/*");
     }
 
@@ -140,25 +144,26 @@ public class SettingsFragment extends Fragment {
                 inputStream.close();
                 outputStream.close();
 
-                // Save to database
+                // 持久化到 SharedPreferences（独立于 Activity 生命周期）
+                pref.edit().putString(KEY_BG_IMAGE_PATH, bgFile.getAbsolutePath()).apply();
+
+                // 保存到数据库（用于多图管理）
                 AppDatabase db = AppDatabase.getInstance(requireContext());
                 db.backgroundImageDao().deactivateAllBackgrounds();
-
                 BackgroundImageEntity entity = new BackgroundImageEntity(bgFile.getAbsolutePath());
                 entity.setActive(true);
                 db.backgroundImageDao().insertBackground(entity);
 
-                // 通知 MainActivity 刷新背景图
-                if (isAdded() && getContext() != null) {
-                    mainHandler.post(() -> {
-                        requireActivity().recreate();
-                    });
-                }
+                requireActivity().runOnUiThread(() -> {
+                    if (isAdded() && getContext() != null) {
+                        Toast.makeText(getContext(), R.string.background_updated, Toast.LENGTH_SHORT).show();
+                    }
+                });
 
             } catch (Exception e) {
                 e.printStackTrace();
                 if (isAdded() && getContext() != null) {
-                    mainHandler.post(() -> {
+                    requireActivity().runOnUiThread(() -> {
                         if (isAdded() && getContext() != null) {
                             Toast.makeText(getContext(), R.string.error, Toast.LENGTH_SHORT).show();
                         }
@@ -171,32 +176,33 @@ public class SettingsFragment extends Fragment {
     private void removeBackgroundImage() {
         if (!isAdded() || getContext() == null) return;
 
+        String savedPath = pref.getString(KEY_BG_IMAGE_PATH, null);
+        if (savedPath == null) {
+            Toast.makeText(getContext(), R.string.no_background_to_remove, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         executor.execute(() -> {
             if (!isAdded() || getContext() == null) return;
 
-            AppDatabase db = AppDatabase.getInstance(requireContext());
-            BackgroundImageEntity bg = db.backgroundImageDao().getActiveBackground();
-
-            if (bg != null) {
-                // Delete file
-                File file = new File(bg.getImagePath());
-                if (file.exists()) {
-                    file.delete();
-                }
-
-                // Remove from database
-                db.backgroundImageDao().deleteBackground(bg);
-
-                if (isAdded() && getContext() != null) {
-                    mainHandler.post(() -> {
-                        if (isAdded() && getContext() != null) {
-                            Toast.makeText(getContext(), R.string.background_removed, Toast.LENGTH_SHORT).show();
-                            // 刷新 Activity 移除背景
-                            requireActivity().recreate();
-                        }
-                    });
-                }
+            // 删除文件
+            File file = new File(savedPath);
+            if (file.exists()) {
+                file.delete();
             }
+
+            // 清除 SharedPreferences
+            pref.edit().remove(KEY_BG_IMAGE_PATH).apply();
+
+            // 清除数据库记录
+            AppDatabase db = AppDatabase.getInstance(requireContext());
+            db.backgroundImageDao().deactivateAllBackgrounds();
+
+            requireActivity().runOnUiThread(() -> {
+                if (isAdded() && getContext() != null) {
+                    Toast.makeText(getContext(), R.string.background_removed, Toast.LENGTH_SHORT).show();
+                }
+            });
         });
     }
 

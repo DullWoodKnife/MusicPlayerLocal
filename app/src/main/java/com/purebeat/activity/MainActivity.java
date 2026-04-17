@@ -1,6 +1,7 @@
 package com.purebeat.activity;
 
 import android.Manifest;
+import android.content.SharedPreferences;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -66,6 +67,10 @@ public class MainActivity extends AppCompatActivity implements MusicController.M
 
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final String[] TAB_TITLES = {"歌曲", "文件夹", "歌单", "设置"};
+    private static final String PREF_NAME = "purebeat_settings";
+    private static final String KEY_BG_IMAGE_PATH = "background_image_path";
+    private static final String RESULT_KEY_BG_CHANGED = "bg_changed";
+    private static final String RESULT_KEY_BG_REMOVED = "bg_removed";
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -89,6 +94,7 @@ public class MainActivity extends AppCompatActivity implements MusicController.M
         checkPermissionAndLoadMusic();
         setupViewPager();
         setupMiniPlayer();
+        setupFragmentResultListener();
         loadBackgroundImage();
     }
 
@@ -222,23 +228,49 @@ public class MainActivity extends AppCompatActivity implements MusicController.M
         }
     }
 
+    private void setupFragmentResultListener() {
+        getSupportFragmentManager().setFragmentResultListener(RESULT_KEY_BG_CHANGED, this, (requestKey, result) -> {
+            refreshBackgroundImage();
+        });
+    }
+
+    private void refreshBackgroundImage() {
+        SharedPreferences pref = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        String imagePath = pref.getString(KEY_BG_IMAGE_PATH, null);
+
+        if (imagePath != null) {
+            ivBackground.setVisibility(View.VISIBLE);
+            Glide.with(this).load(imagePath).into(ivBackground);
+        } else {
+            ivBackground.setVisibility(View.GONE);
+        }
+    }
+
     private void loadBackgroundImage() {
         executor.execute(() -> {
-            AppDatabase db = AppDatabase.getInstance(this);
-            BackgroundImageEntity bg = db.backgroundImageDao().getActiveBackground();
-            if (bg != null && bg.getImagePath() != null) {
-                String imagePath = bg.getImagePath();
-                mainHandler.post(() -> {
-                    // 检查 Activity 状态
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
-                    ivBackground.setVisibility(View.VISIBLE);
-                    Glide.with(this)
-                        .load(imagePath)
-                        .into(ivBackground);
-                });
+            // 优先从 SharedPreferences 读取（设置页修改后由其写入）
+            SharedPreferences pref = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+            String imagePath = pref.getString(KEY_BG_IMAGE_PATH, null);
+
+            // SharedPreferences 没有时回退到数据库（兼容旧数据）
+            if (imagePath == null) {
+                AppDatabase db = AppDatabase.getInstance(this);
+                BackgroundImageEntity bg = db.backgroundImageDao().getActiveBackground();
+                if (bg != null && bg.getImagePath() != null) {
+                    imagePath = bg.getImagePath();
+                }
             }
+
+            final String path = imagePath;
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (path != null) {
+                    ivBackground.setVisibility(View.VISIBLE);
+                    Glide.with(this).load(path).into(ivBackground);
+                } else {
+                    ivBackground.setVisibility(View.GONE);
+                }
+            });
         });
     }
 

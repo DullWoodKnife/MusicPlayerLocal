@@ -53,7 +53,9 @@
     <string name="select_background">选择背景图片</string>
     <string name="remove_background">移除背景</string>
     <string name="background_set">背景已设置</string>
+    <string name="background_updated">背景已更新</string>
     <string name="background_removed">背景已移除</string>
+    <string name="no_background_to_remove">没有可移除的背景</string>
 
     <!-- Permission -->
     <string name="permission_required">需要存储权限</string>
