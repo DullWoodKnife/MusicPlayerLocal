@@ -223,7 +223,7 @@ public class MusicPlaybackService extends MediaSessionService {
             player.seekToPrevious();
             currentIndex = player.getCurrentMediaItemIndex();
         } else {
-            player.seekTo(player.getDuration(), 0);
+            player.seekTo(0);
             currentIndex = currentPlaylist.size() - 1;
         }
     }

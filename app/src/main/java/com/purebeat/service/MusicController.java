@@ -269,7 +269,7 @@ public class MusicController {
             } else if (mediaController.hasPreviousMediaItem()) {
                 mediaController.seekToPrevious();
             } else {
-                mediaController.seekTo(mediaController.getDuration(), 0);
+                mediaController.seekTo(0);
             }
         }
     }
