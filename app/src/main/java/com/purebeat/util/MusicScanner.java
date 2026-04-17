@@ -12,7 +12,6 @@ import com.purebeat.model.Folder;
 import com.purebeat.model.Song;
 
 import java.io.File;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,12 +42,8 @@ public class MusicScanner {
         // 如果字符串已经是有效的 UTF-8（不包含替换字符），直接返回
         if (raw.contains("\uFFFD")) {
             // 尝试用 ISO-8859-1 重新解释字节，再编码为 UTF-8
-            try {
-                byte[] bytes = raw.getBytes(StandardCharsets.ISO_8859_1);
-                return new String(bytes, StandardCharsets.UTF_8);
-            } catch (UnsupportedEncodingException e) {
-                return raw;
-            }
+            byte[] bytes = raw.getBytes(StandardCharsets.ISO_8859_1);
+            return new String(bytes, StandardCharsets.UTF_8);
         }
         return raw;
     }
