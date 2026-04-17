@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PureBeat</string>
+
+    <!-- Navigation -->
+    <string name="tab_songs">歌曲</string>
+    <string name="tab_folders">文件夹</string>
+    <string name="tab_playlists">歌单</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Player -->
+    <string name="now_playing">正在播放</string>
+    <string name="no_song_playing">未播放音乐</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
+    <string name="next">下一首</string>
+    <string name="previous">上一首</string>
+
+    <!-- Playback modes -->
+    <string name="mode_sequence">顺序播放</string>
+    <string name="mode_shuffle">随机播放</string>
+    <string name="mode_repeat_one">单曲循环</string>
+
+    <!-- Playlist -->
+    <string name="create_playlist">创建歌单</string>
+    <string name="playlist_name">歌单名称</string>
+    <string name="edit_playlist">编辑歌单</string>
+    <string name="delete_playlist">删除歌单</string>
+    <string name="add_to_playlist">添加到歌单</string>
+    <string name="remove_from_playlist">从歌单移除</string>
+    <string name="no_playlists">暂无歌单</string>
+    <string name="empty_playlist">歌单为空</string>
+    <string name="playlist_created">歌单已创建</string>
+    <string name="playlist_deleted">歌单已删除</string>
+    <string name="song_added">已添加到歌单</string>
+    <string name="song_removed">已从歌单移除</string>
+    <string name="confirm_delete_playlist">确定要删除这个歌单吗？</string>
+
+    <!-- Folders -->
+    <string name="folders_title">文件夹</string>
+    <string name="no_folders">未找到文件夹</string>
+    <string name="no_songs">暂无歌曲</string>
+    <string name="folder_songs_count">%d 首歌曲</string>
+
+    <!-- Settings -->
+    <string name="settings">设置</string>
+    <string name="scan_music">扫描音乐</string>
+    <string name="scanning">正在扫描...</string>
+    <string name="scan_complete">扫描完成</string>
+    <string name="about">关于</string>
+    <string name="version">版本</string>
+    <string name="background_image">自定义背景</string>
+    <string name="select_background">选择背景图片</string>
+    <string name="remove_background">移除背景</string>
+    <string name="background_set">背景已设置</string>
+    <string name="background_removed">背景已移除</string>
+
+    <!-- Permission -->
+    <string name="permission_required">需要存储权限</string>
+    <string name="permission_message">需要读取存储权限才能扫描本地音乐文件</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="permission_denied">权限被拒绝</string>
+
+    <!-- General -->
+    <string name="ok">确定</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="save">保存</string>
+    <string name="loading">加载中...</string>
+    <string name="error">错误</string>
+    <string name="success">成功</string>
+    <string name="songs_count">%d 首歌曲</string>
+    <string name="unknown_artist">未知艺术家</string>
+    <string name="unknown_album">未知专辑</string>
+</resources>
